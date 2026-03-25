@@ -1,0 +1,59 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    --background: 0.09 0.025 265;
+    --foreground: 0.97 0.012 265;
+    --card: 0.14 0.03 265;
+    --card-foreground: 0.97 0.012 265;
+    --popover: 0.14 0.03 265;
+    --popover-foreground: 0.97 0.012 265;
+    --primary: 0.58 0.22 293;
+    --primary-foreground: 0.97 0.012 265;
+    --secondary: 0.18 0.04 265;
+    --secondary-foreground: 0.97 0.012 265;
+    --muted: 0.18 0.04 265;
+    --muted-foreground: 0.73 0.022 265;
+    --accent: 0.18 0.04 265;
+    --accent-foreground: 0.97 0.012 265;
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.985 0 0;
+    --border: 1 0 0 / 10%;
+    --input: 1 0 0 / 10%;
+    --ring: 0.58 0.22 293;
+    --chart-1: 0.58 0.22 293;
+    --chart-2: 0.82 0.12 195;
+    --chart-3: 0.5 0.22 280;
+    --chart-4: 0.73 0.022 265;
+    --chart-5: 0.97 0.012 265;
+    --sidebar: 0.11 0.03 265;
+    --sidebar-foreground: 0.97 0.012 265;
+    --sidebar-primary: 0.58 0.22 293;
+    --sidebar-primary-foreground: 0.97 0.012 265;
+    --sidebar-accent: 0.18 0.04 265;
+    --sidebar-accent-foreground: 0.97 0.012 265;
+    --sidebar-border: 1 0 0 / 10%;
+    --sidebar-ring: 0.58 0.22 293;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", sans-serif;
+    background-color: #070a12;
+    color: #f2f5ff;
+  }
+}
