@@ -7,7 +7,9 @@ import {
   createRouter,
   redirect,
 } from "@tanstack/react-router";
+import { isAuthenticated } from "./hooks/useAuth";
 import AIToolsPage from "./pages/AIToolsPage";
+import AdminPage from "./pages/AdminPage";
 import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
 import ContactPage from "./pages/ContactPage";
@@ -15,7 +17,9 @@ import DashboardPage from "./pages/DashboardPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
+import ToolsPage from "./pages/ToolsPage";
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -46,11 +50,26 @@ const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
   component: DashboardPage,
-  beforeLoad: ({ context }: { context: { isAuthenticated?: boolean } }) => {
-    if (!context?.isAuthenticated) {
+  beforeLoad: () => {
+    if (!isAuthenticated()) {
       throw redirect({ to: "/login" });
     }
   },
+});
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile",
+  component: ProfilePage,
+  beforeLoad: () => {
+    if (!isAuthenticated()) {
+      throw redirect({ to: "/login" });
+    }
+  },
+});
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
 });
 const blogRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -65,7 +84,15 @@ const blogPostRoute = createRoute({
 const toolsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tools",
+  component: ToolsPage,
+});
+const aiToolsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/ai-tools",
   component: AIToolsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tool: typeof search.tool === "string" ? search.tool : undefined,
+  }),
 });
 const contactRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -83,9 +110,12 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
   dashboardRoute,
+  profileRoute,
+  adminRoute,
   blogRoute,
   blogPostRoute,
   toolsRoute,
+  aiToolsRoute,
   contactRoute,
   notFoundRoute,
 ]);

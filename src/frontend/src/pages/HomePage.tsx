@@ -91,7 +91,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#070A12] text-[#F2F5FF]">
       <Header />
-
       <main>
         {/* Hero */}
         <section className="pt-32 pb-20 px-4 sm:px-6 max-w-7xl mx-auto">
@@ -148,12 +147,16 @@ export default function HomePage() {
               transition={{ duration: 0.7, delay: 0.2 }}
               className="relative flex justify-center"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-[#8B5CF6]/20 to-[#22D3EE]/20 rounded-3xl blur-3xl" />
-              <img
-                src="/assets/generated/hero-ai-network.dim_600x500.png"
-                alt="AI Network visualization"
-                className="relative rounded-2xl border border-white/10 shadow-glow animate-float max-w-full"
-              />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#8B5CF6]/30 to-[#22D3EE]/30 rounded-3xl blur-3xl" />
+              <div className="relative p-1 rounded-2xl bg-gradient-to-br from-[#8B5CF6] via-[#5B5CF6] to-[#22D3EE] shadow-[0_0_40px_rgba(139,92,246,0.5)]">
+                <div className="rounded-[14px] overflow-hidden w-[380px] h-[380px] sm:w-[420px] sm:h-[420px]">
+                  <img
+                    src="/assets/uploads/whatsapp_image_2026-03-25_at_11.46.06_pm-019d2f73-7c92-75c4-a4b2-3e8815025060-1.jpeg"
+                    alt="NexaAI Platform"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
             </motion.div>
           </div>
         </section>
@@ -211,26 +214,12 @@ export default function HomePage() {
                     className="p-6 rounded-xl border border-white/10 bg-[#11182A] text-left"
                   >
                     <div className="flex mb-4">
-                      <Star
-                        key="s1"
-                        className="w-4 h-4 fill-[#8B5CF6] text-[#8B5CF6]"
-                      />
-                      <Star
-                        key="s2"
-                        className="w-4 h-4 fill-[#8B5CF6] text-[#8B5CF6]"
-                      />
-                      <Star
-                        key="s3"
-                        className="w-4 h-4 fill-[#8B5CF6] text-[#8B5CF6]"
-                      />
-                      <Star
-                        key="s4"
-                        className="w-4 h-4 fill-[#8B5CF6] text-[#8B5CF6]"
-                      />
-                      <Star
-                        key="s5"
-                        className="w-4 h-4 fill-[#8B5CF6] text-[#8B5CF6]"
-                      />
+                      {["s1", "s2", "s3", "s4", "s5"].map((k) => (
+                        <Star
+                          key={k}
+                          className="w-4 h-4 fill-[#8B5CF6] text-[#8B5CF6]"
+                        />
+                      ))}
                     </div>
                     <p className="text-[#F2F5FF] text-sm leading-relaxed mb-4">
                       "{t.quote}"
@@ -310,14 +299,18 @@ export default function HomePage() {
                   </span>
                 </h2>
                 <p className="text-[#A8B0C4] text-lg mb-6">
-                  Summarize text, generate content, and chat with AI assistants
-                  — all built into your workspace.
+                  Summarize text, generate content, write code, check grammar,
+                  and chat with AI assistants — all built into your workspace.
                 </p>
                 <ul className="space-y-3 mb-8">
                   {[
                     "Text Summarizer",
                     "AI Chat Assistant",
                     "Content Generator",
+                    "Code Generator",
+                    "Grammar Checker",
+                    "Voice to Text",
+                    "Image Generation",
                   ].map((tool) => (
                     <li
                       key={tool}
@@ -339,7 +332,6 @@ export default function HomePage() {
                   </Button>
                 </Link>
               </motion.div>
-
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -425,7 +417,6 @@ export default function HomePage() {
           </div>
         </section>
       </main>
-
       <Footer />
     </div>
   );

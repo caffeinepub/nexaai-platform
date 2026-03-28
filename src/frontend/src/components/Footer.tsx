@@ -3,7 +3,6 @@ import { Github, Linkedin, Twitter, Zap } from "lucide-react";
 
 export default function Footer() {
   const year = new Date().getFullYear();
-  const utm = `https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(typeof window !== "undefined" ? window.location.hostname : "")} `;
 
   const columns = [
     {
@@ -114,18 +113,7 @@ export default function Footer() {
 
         <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-[#A8B0C4] text-sm">
-            © {year}. Built with ❤️ using{" "}
-            <a
-              href={utm}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#8B5CF6] hover:underline"
-            >
-              caffeine.ai
-            </a>
-          </p>
-          <p className="text-[#A8B0C4] text-xs">
-            NexaAI Platform — All rights reserved
+            © {year} NexaAI Platform. All rights reserved.
           </p>
         </div>
       </div>

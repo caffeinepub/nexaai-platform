@@ -8,18 +8,56 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Link, useSearch } from "@tanstack/react-router";
 import {
+  CheckCircle,
+  Code2,
+  Crown,
   FileText,
+  ImageIcon,
+  Key,
   Loader2,
+  Lock,
   MessageCircle,
+  Mic,
   PenTool,
   Send,
   Sparkles,
+  Wifi,
 } from "lucide-react";
-import { motion } from "motion/react";
-import { useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
+import { useActor } from "../hooks/useActor";
+import { getCurrentUser } from "../hooks/useAuth";
+
+const PRO_STORAGE_KEY = "nexaai_pro_users";
+function isUserPro(email: string): boolean {
+  try {
+    const list: string[] = JSON.parse(
+      localStorage.getItem(PRO_STORAGE_KEY) || "[]",
+    );
+    return list.includes(email);
+  } catch {
+    return false;
+  }
+}
+
+function parseGroqResponse(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw);
+    const content = parsed?.choices?.[0]?.message?.content;
+    if (content && typeof content === "string") return content;
+    const errMsg = parsed?.error?.message;
+    if (errMsg) return `AI Error: ${errMsg}`;
+    return raw;
+  } catch {
+    return raw;
+  }
+}
+
+type SaveHistoryFn = (toolName: string, input: string, output: string) => void;
 
 interface ChatMessage {
   role: "user" | "ai";
@@ -27,36 +65,31 @@ interface ChatMessage {
   id: string;
 }
 
-const AI_RESPONSES = [
-  "That's a great question! Based on my analysis, here's what I think: AI systems work best when they're grounded in specific domain knowledge while remaining flexible enough to generalize across related tasks.",
-  "Excellent point. The key insight here is that modern AI tools are most effective when integrated early into the workflow rather than bolted on after the fact.",
-  "I've processed your input. The core pattern I see is a need for iterative refinement — starting with a broad framing and progressively narrowing to the specific outcome you're targeting.",
-  "Great context. Building on that, I'd suggest exploring the intersection of your goal with existing frameworks. This often reveals shortcuts that aren't obvious from first principles.",
-];
-
-function summarize(text: string): string {
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 20);
-  if (sentences.length <= 2) return text.trim();
-  const shortened = sentences
-    .slice(0, Math.max(2, Math.floor(sentences.length * 0.35)))
-    .join(". ")
-    .trim();
-  return `${shortened}.`;
-}
-
-function TextSummarizer() {
+function TextSummarizer({
+  onSave,
+  actor,
+}: { onSave: SaveHistoryFn; actor: any }) {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSummarize = () => {
-    if (!input.trim()) return;
+  const handleSummarize = async () => {
+    if (!input.trim() || !actor) return;
     setLoading(true);
     setOutput("");
-    setTimeout(() => {
-      setOutput(summarize(input));
+    try {
+      const raw = await actor.callGroqAI(
+        input,
+        "You are a text summarizer. Summarize the following text concisely in 2-3 sentences.",
+      );
+      const result = parseGroqResponse(raw);
+      setOutput(result);
+      onSave("Text Summarizer", input.slice(0, 500), result.slice(0, 500));
+    } catch {
+      setOutput("Error: Could not get AI response. Please try again.");
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -75,19 +108,17 @@ function TextSummarizer() {
       </div>
       <Button
         onClick={handleSummarize}
-        disabled={loading || !input.trim()}
+        disabled={loading || !input.trim() || !actor}
         className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90"
         data-ocid="tools.primary_button"
       >
         {loading ? (
           <>
-            <Loader2 className="mr-2 w-4 h-4 animate-spin" />
-            Summarizing...
+            <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Summarizing...
           </>
         ) : (
           <>
-            <Sparkles className="mr-2 w-4 h-4" />
-            Summarize
+            <Sparkles className="mr-2 w-4 h-4" /> Summarize
           </>
         )}
       </Button>
@@ -108,7 +139,7 @@ function TextSummarizer() {
   );
 }
 
-function AIChat() {
+function AIChat({ onSave, actor }: { onSave: SaveHistoryFn; actor: any }) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "init",
@@ -120,26 +151,41 @@ function AIChat() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  const sendMessage = async () => {
+    if (!input.trim() || !actor) return;
+    const userInput = input;
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: "user",
-      content: input,
+      content: userInput,
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
-    setTimeout(() => {
-      const aiResponse =
-        AI_RESPONSES[Math.floor(Math.random() * AI_RESPONSES.length)];
+    try {
+      const raw = await actor.callGroqAI(
+        userInput,
+        "You are a helpful AI assistant for NexaAI platform. Be concise and helpful.",
+      );
+      const aiResponse = parseGroqResponse(raw);
       setMessages((prev) => [
         ...prev,
         { id: `a-${Date.now()}`, role: "ai", content: aiResponse },
       ]);
+      onSave("AI Chat", userInput.slice(0, 500), aiResponse.slice(0, 500));
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `a-${Date.now()}`,
+          role: "ai",
+          content: "Error: Could not get AI response. Please try again.",
+        },
+      ]);
+    } finally {
       setLoading(false);
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 1000);
+    }
   };
 
   return (
@@ -150,9 +196,7 @@ function AIChat() {
             key={msg.id}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`flex ${
-              msg.role === "user" ? "justify-end" : "justify-start"
-            }`}
+            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
               className={`max-w-[80%] px-4 py-2.5 rounded-xl text-sm ${
@@ -190,7 +234,7 @@ function AIChat() {
         />
         <Button
           onClick={sendMessage}
-          disabled={loading || !input.trim()}
+          disabled={loading || !input.trim() || !actor}
           className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 shrink-0"
           data-ocid="tools.submit_button"
         >
@@ -201,32 +245,37 @@ function AIChat() {
   );
 }
 
-function ContentGenerator() {
+function ContentGenerator({
+  onSave,
+  actor,
+}: { onSave: SaveHistoryFn; actor: any }) {
   const [prompt, setPrompt] = useState("");
   const [contentType, setContentType] = useState("blog-post");
   const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const GENERATED = {
-    "blog-post":
-      "# 5 Ways AI Is Transforming Modern Business\n\nArtificial intelligence is no longer a future concept — it's reshaping how companies operate right now. From automating repetitive tasks to generating strategic insights, here are five ways AI is making its mark.\n\n1. **Automated Decision Making** — AI systems can now analyze thousands of variables and recommend optimal decisions faster than any human team.\n\n2. **Hyper-Personalization** — Machine learning enables companies to tailor every customer touchpoint at scale.\n\n3. **Predictive Maintenance** — Industrial AI systems predict equipment failures before they happen, saving millions in downtime.\n\n4. **Natural Language Interfaces** — Employees can now interact with complex systems using plain English.\n\n5. **Real-Time Analytics** — AI processes streaming data instantly, enabling live business intelligence.",
-    "social-post":
-      "🚀 AI isn't the future — it's the present.\n\nTeams that embrace AI-native workflows today will define the industry benchmarks of tomorrow.\n\nAt NexaAI, we're building the platform that makes this transition seamless. Model management, automated workflows, and team collaboration — all in one place.\n\nWhat's your biggest challenge with AI adoption? Drop it in the comments 👇\n\n#AI #Productivity #NexaAI #FutureOfWork",
-    email:
-      "Subject: Your AI Platform Advantage Starts Here\n\nHi [Name],\n\nI wanted to reach out about how teams like yours are using NexaAI to cut AI integration time from weeks to hours.\n\nHere's what our users typically see in the first 30 days:\n• 40% reduction in time spent on manual AI workflows\n• 3x faster model deployment cycles\n• Significant improvement in cross-team AI knowledge sharing\n\nWould you be open to a 20-minute walk-through? I'd love to show you how [Company] could benefit.\n\nBest,\nThe NexaAI Team",
-  };
-
-  const handleGenerate = () => {
-    if (!prompt.trim()) return;
+  const handleGenerate = async () => {
+    if (!prompt.trim() || !actor) return;
     setLoading(true);
     setOutput("");
-    setTimeout(() => {
-      setOutput(
-        GENERATED[contentType as keyof typeof GENERATED] ??
-          GENERATED["blog-post"],
+    const systemMap: Record<string, string> = {
+      "blog-post": "Write a well-structured blog post.",
+      "social-post": "Write an engaging social media post.",
+      email: "Write a professional email.",
+    };
+    try {
+      const raw = await actor.callGroqAI(
+        prompt,
+        systemMap[contentType] ?? systemMap["blog-post"],
       );
+      const result = parseGroqResponse(raw);
+      setOutput(result);
+      onSave("Content Generator", prompt.slice(0, 500), result.slice(0, 500));
+    } catch {
+      setOutput("Error: Could not get AI response. Please try again.");
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -271,19 +320,17 @@ function ContentGenerator() {
       </div>
       <Button
         onClick={handleGenerate}
-        disabled={loading || !prompt.trim()}
+        disabled={loading || !prompt.trim() || !actor}
         className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90"
         data-ocid="tools.primary_button"
       >
         {loading ? (
           <>
-            <Loader2 className="mr-2 w-4 h-4 animate-spin" />
-            Generating...
+            <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Generating...
           </>
         ) : (
           <>
-            <Sparkles className="mr-2 w-4 h-4" />
-            Generate Content
+            <Sparkles className="mr-2 w-4 h-4" /> Generate Content
           </>
         )}
       </Button>
@@ -306,65 +353,637 @@ function ContentGenerator() {
   );
 }
 
+function CodeGenerator({
+  onSave,
+  actor,
+}: { onSave: SaveHistoryFn; actor: any }) {
+  const [prompt, setPrompt] = useState("");
+  const [language, setLanguage] = useState("javascript");
+  const [output, setOutput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!prompt.trim() || !actor) return;
+    setLoading(true);
+    setOutput("");
+    try {
+      const raw = await actor.callGroqAI(
+        prompt,
+        `You are an expert programmer. Write clean, working ${language} code for the following requirement. Return only the code, no explanation.`,
+      );
+      const result = parseGroqResponse(raw);
+      setOutput(result);
+      onSave("Code Generator", prompt.slice(0, 500), result.slice(0, 500));
+    } catch {
+      setOutput("Error: Could not get AI response. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4" data-ocid="tools.panel">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+            Describe What to Build
+          </p>
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="e.g. A function that fetches user data from an API..."
+            className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 h-24 resize-none focus:border-[#8B5CF6]/50"
+            data-ocid="tools.textarea"
+          />
+        </div>
+        <div>
+          <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+            Language
+          </p>
+          <Select value={language} onValueChange={setLanguage}>
+            <SelectTrigger
+              className="bg-[#070A12] border-white/10 text-[#F2F5FF]"
+              data-ocid="tools.select"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#11182A] border-white/10">
+              <SelectItem value="javascript" className="text-[#F2F5FF]">
+                JavaScript
+              </SelectItem>
+              <SelectItem value="python" className="text-[#F2F5FF]">
+                Python
+              </SelectItem>
+              <SelectItem value="typescript" className="text-[#F2F5FF]">
+                TypeScript
+              </SelectItem>
+              <SelectItem value="html-css" className="text-[#F2F5FF]">
+                HTML / CSS
+              </SelectItem>
+              <SelectItem value="sql" className="text-[#F2F5FF]">
+                SQL
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Button
+        onClick={handleGenerate}
+        disabled={loading || !prompt.trim() || !actor}
+        className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90"
+        data-ocid="tools.primary_button"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Generating Code...
+          </>
+        ) : (
+          <>
+            <Code2 className="mr-2 w-4 h-4" /> Generate Code
+          </>
+        )}
+      </Button>
+      {output && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-ocid="tools.success_state"
+        >
+          <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+            Generated Code
+          </p>
+          <pre className="bg-[#070A12] border border-[#8B5CF6]/20 rounded-lg p-4 text-[#22D3EE] text-sm font-mono leading-relaxed overflow-x-auto whitespace-pre">
+            {output}
+          </pre>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+function GrammarChecker({
+  onSave,
+  actor,
+}: { onSave: SaveHistoryFn; actor: any }) {
+  const [input, setInput] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleCheck = async () => {
+    if (!input.trim() || !actor) return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const raw = await actor.callGroqAI(
+        input,
+        "You are a grammar checker. Correct the grammar and style of the following text. Return the corrected text followed by a brief list of changes made.",
+      );
+      const aiResult = parseGroqResponse(raw);
+      setResult(aiResult);
+      onSave("Grammar Checker", input.slice(0, 500), aiResult.slice(0, 500));
+    } catch {
+      setResult("Error: Could not get AI response. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4" data-ocid="tools.panel">
+      <div>
+        <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+          Paste Your Text
+        </p>
+        <Textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Paste the text you want to check for grammar and style..."
+          className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 min-h-40 resize-none focus:border-[#8B5CF6]/50"
+          data-ocid="tools.textarea"
+        />
+      </div>
+      <Button
+        onClick={handleCheck}
+        disabled={loading || !input.trim() || !actor}
+        className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90"
+        data-ocid="tools.primary_button"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Checking...
+          </>
+        ) : (
+          <>
+            <CheckCircle className="mr-2 w-4 h-4" /> Check Grammar
+          </>
+        )}
+      </Button>
+      {result && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/5 p-4"
+          data-ocid="tools.success_state"
+        >
+          <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+            Grammar Check Result
+          </p>
+          <p className="text-[#F2F5FF] text-sm leading-relaxed whitespace-pre-wrap">
+            {result}
+          </p>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+function VoiceToText({ onSave }: { onSave: SaveHistoryFn }) {
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [saved, setSaved] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    setSupported(!!SR);
+  }, []);
+
+  const handleSaveTranscript = () => {
+    if (!transcript.trim() || saved) return;
+    onSave("Voice to Text", "[Voice recording]", transcript.slice(0, 500));
+    setSaved(true);
+  };
+
+  const toggleRecording = () => {
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+    setSaved(false);
+    const recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.onresult = (event: any) => {
+      let finalText = "";
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal)
+          finalText += `${event.results[i][0].transcript} `;
+      }
+      setTranscript(finalText.trim());
+    };
+    recognition.onend = () => setIsRecording(false);
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsRecording(true);
+  };
+
+  if (supported === false) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center py-16 text-center"
+        data-ocid="tools.panel"
+      >
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+          <Mic className="w-8 h-8 text-[#A8B0C4]" />
+        </div>
+        <p className="text-[#F2F5FF] font-medium mb-2">
+          Voice Recognition Not Supported
+        </p>
+        <p className="text-[#A8B0C4] text-sm max-w-xs">
+          Your browser doesn't support the Web Speech API. Try Chrome or Edge
+          for the best experience.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-ocid="tools.panel">
+      <div className="flex flex-col items-center py-8 gap-5">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={toggleRecording}
+          className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border-0 outline-none ${
+            isRecording
+              ? "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_40px_rgba(239,68,68,0.5)]"
+              : "bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] shadow-[0_0_30px_rgba(139,92,246,0.4)]"
+          }`}
+          data-ocid="tools.primary_button"
+        >
+          {isRecording && (
+            <motion.div
+              className="absolute inset-0 rounded-full border-2 border-red-400"
+              animate={{ scale: [1, 1.4, 1], opacity: [1, 0, 1] }}
+              transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
+            />
+          )}
+          <Mic className="w-10 h-10 text-white" />
+        </motion.button>
+        <p className="text-[#A8B0C4] text-sm font-medium">
+          {isRecording ? (
+            <span className="text-red-400 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+              Recording... click to stop
+            </span>
+          ) : (
+            "Click the microphone to start recording"
+          )}
+        </p>
+      </div>
+      <div>
+        <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+          Transcribed Text
+        </p>
+        <Textarea
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          placeholder="Your speech will appear here..."
+          className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 min-h-32 resize-none"
+          data-ocid="tools.textarea"
+        />
+        {transcript && !saved && (
+          <Button
+            onClick={handleSaveTranscript}
+            size="sm"
+            variant="outline"
+            className="mt-2 border-[#8B5CF6]/30 text-[#8B5CF6] hover:bg-[#8B5CF6]/10"
+            data-ocid="tools.save_button"
+          >
+            Save to History
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ImageGeneration({ onSave }: { onSave: SaveHistoryFn }) {
+  const [prompt, setPrompt] = useState("");
+  const [style, setStyle] = useState("photorealistic");
+  const [loading, setLoading] = useState(false);
+  const [shown, setShown] = useState(false);
+
+  const handleGenerate = () => {
+    if (!prompt.trim()) return;
+    setLoading(true);
+    setShown(false);
+    setTimeout(() => {
+      setLoading(false);
+      setShown(true);
+      onSave(
+        "Image Generation",
+        prompt.slice(0, 500),
+        "[Image generation queued -- Coming Soon]",
+      );
+    }, 2000);
+  };
+
+  return (
+    <div className="space-y-4" data-ocid="tools.panel">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+            Image Description
+          </p>
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="e.g. A futuristic city skyline at night with neon lights..."
+            className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 h-24 resize-none focus:border-[#8B5CF6]/50"
+            data-ocid="tools.textarea"
+          />
+        </div>
+        <div>
+          <p className="text-[#A8B0C4] text-xs uppercase tracking-wider mb-2">
+            Style
+          </p>
+          <Select value={style} onValueChange={setStyle}>
+            <SelectTrigger
+              className="bg-[#070A12] border-white/10 text-[#F2F5FF]"
+              data-ocid="tools.select"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#11182A] border-white/10">
+              <SelectItem value="photorealistic" className="text-[#F2F5FF]">
+                Photorealistic
+              </SelectItem>
+              <SelectItem value="cartoon" className="text-[#F2F5FF]">
+                Cartoon
+              </SelectItem>
+              <SelectItem value="abstract" className="text-[#F2F5FF]">
+                Abstract
+              </SelectItem>
+              <SelectItem value="minimalist" className="text-[#F2F5FF]">
+                Minimalist
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Button
+        onClick={handleGenerate}
+        disabled={loading || !prompt.trim()}
+        className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90"
+        data-ocid="tools.primary_button"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Generating
+            Image...
+          </>
+        ) : (
+          <>
+            <ImageIcon className="mr-2 w-4 h-4" /> Generate Image
+          </>
+        )}
+      </Button>
+      <AnimatePresence>
+        {shown && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="rounded-xl border border-[#8B5CF6]/30 bg-[#8B5CF6]/5 overflow-hidden"
+            data-ocid="tools.success_state"
+          >
+            <div className="relative h-52 flex flex-col items-center justify-center gap-4 px-6">
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(34,211,238,0.15) 50%, rgba(139,92,246,0.1) 100%)",
+                }}
+              />
+              <div className="relative z-10 flex flex-col items-center gap-3 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] flex items-center justify-center">
+                  <ImageIcon className="w-7 h-7 text-white" />
+                </div>
+                <p className="text-[#F2F5FF] font-semibold text-lg">
+                  AI Image Generation
+                </p>
+                <p className="text-[#A8B0C4] text-sm max-w-xs">
+                  Available with Groq Vision API -- coming soon to NexaAI Pro.
+                  Your prompt has been queued.
+                </p>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#22D3EE]/10 border border-[#22D3EE]/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#22D3EE] animate-pulse" />
+                  <span className="text-[#22D3EE] text-xs font-medium">
+                    Coming Soon
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+const TAB_IDS: Record<string, string> = {
+  summarizer: "summarizer",
+  chat: "chat",
+  generator: "generator",
+  code: "code",
+  grammar: "grammar",
+  voice: "voice",
+  image: "image",
+};
+
 export default function AIToolsPage() {
+  const { actor } = useActor();
+  const currentUser = getCurrentUser();
+  const [isPro, setIsPro] = useState<boolean>(() => {
+    if (!currentUser) return false;
+    return isUserPro(currentUser.email);
+  });
+  const search = useSearch({ from: "/ai-tools" });
+  const defaultTab =
+    search.tool && TAB_IDS[search.tool] ? search.tool : "summarizer";
+
+  useEffect(() => {
+    const check = () => {
+      if (currentUser) setIsPro(isUserPro(currentUser.email));
+    };
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [currentUser]);
+
+  const saveHistory: SaveHistoryFn = (toolName, input, output) => {
+    if (!actor) return;
+    actor.saveAIHistory(toolName, input, output).catch(() => {});
+  };
+
   return (
     <div className="min-h-screen bg-[#070A12] text-[#F2F5FF]">
       <Header />
-      <main className="pt-24 pb-20 px-4 sm:px-6 max-w-4xl mx-auto">
+      <main className="pt-24 pb-20 px-4 sm:px-6 max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-10"
         >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="font-heading font-bold text-3xl sm:text-4xl text-[#F2F5FF]">
+                  AI Tools
+                </h1>
+                <p className="text-[#A8B0C4]">
+                  Summarize, chat, generate code, check grammar, and more
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-heading font-bold text-3xl sm:text-4xl text-[#F2F5FF]">
-                AI Tools
-              </h1>
-              <p className="text-[#A8B0C4]">
-                Summarize, chat, and generate content with AI
-              </p>
-            </div>
+            <AnimatePresence>
+              {!actor && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/30"
+                  data-ocid="tools.loading_state"
+                >
+                  <Wifi className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
+                  <span className="text-yellow-400 text-xs font-medium">
+                    Connecting...
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
 
-        <div className="rounded-2xl border border-white/10 bg-[#11182A] overflow-hidden">
-          <Tabs defaultValue="summarizer">
+        <div className="relative rounded-2xl border border-white/10 bg-[#11182A] overflow-hidden">
+          <AnimatePresence>
+            {isPro === false && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, rgba(7,10,18,0.6) 0%, rgba(7,10,18,0.95) 50%)",
+                  backdropFilter: "blur(6px)",
+                }}
+                data-ocid="tools.panel"
+              >
+                <div className="text-center px-6 max-w-sm">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] flex items-center justify-center mx-auto mb-4">
+                    <Lock className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <Crown className="w-4 h-4 text-yellow-400" />
+                    <span className="text-yellow-400 text-xs font-bold uppercase tracking-widest">
+                      Pro Required
+                    </span>
+                  </div>
+                  <h3 className="font-heading font-bold text-xl text-[#F2F5FF] mb-2">
+                    Unlock AI Tools
+                  </h3>
+                  <p className="text-[#A8B0C4] text-sm mb-6">
+                    AI Tools are available exclusively to Pro members. Activate
+                    your license key to get instant access.
+                  </p>
+                  <Link to="/dashboard">
+                    <Button
+                      className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 w-full"
+                      data-ocid="tools.primary_button"
+                    >
+                      <Key className="mr-2 w-4 h-4" /> Activate License Key
+                    </Button>
+                  </Link>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Tabs defaultValue={defaultTab}>
             <TabsList
-              className="w-full bg-[#0B1020] border-b border-white/10 rounded-none h-auto p-1"
+              className="w-full bg-[#0B1020] border-b border-white/10 rounded-none h-auto p-1 flex flex-wrap gap-1"
               data-ocid="tools.tab"
             >
               <TabsTrigger
                 value="summarizer"
-                className="flex items-center gap-2 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg"
+                className="flex items-center gap-1.5 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg text-xs px-3 py-2"
               >
-                <FileText className="w-4 h-4" /> Summarizer
+                <FileText className="w-3.5 h-3.5" /> Summarizer
               </TabsTrigger>
               <TabsTrigger
                 value="chat"
-                className="flex items-center gap-2 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg"
+                className="flex items-center gap-1.5 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg text-xs px-3 py-2"
               >
-                <MessageCircle className="w-4 h-4" /> AI Chat
+                <MessageCircle className="w-3.5 h-3.5" /> AI Chat
               </TabsTrigger>
               <TabsTrigger
                 value="generator"
-                className="flex items-center gap-2 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg"
+                className="flex items-center gap-1.5 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg text-xs px-3 py-2"
               >
-                <PenTool className="w-4 h-4" /> Generator
+                <PenTool className="w-3.5 h-3.5" /> Generator
+              </TabsTrigger>
+              <TabsTrigger
+                value="code"
+                className="flex items-center gap-1.5 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg text-xs px-3 py-2"
+              >
+                <Code2 className="w-3.5 h-3.5" /> Code
+              </TabsTrigger>
+              <TabsTrigger
+                value="grammar"
+                className="flex items-center gap-1.5 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg text-xs px-3 py-2"
+              >
+                <CheckCircle className="w-3.5 h-3.5" /> Grammar
+              </TabsTrigger>
+              <TabsTrigger
+                value="voice"
+                className="flex items-center gap-1.5 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg text-xs px-3 py-2"
+              >
+                <Mic className="w-3.5 h-3.5" /> Voice
+              </TabsTrigger>
+              <TabsTrigger
+                value="image"
+                className="flex items-center gap-1.5 data-[state=active]:bg-[#8B5CF6]/20 data-[state=active]:text-[#8B5CF6] text-[#A8B0C4] rounded-lg text-xs px-3 py-2"
+              >
+                <ImageIcon className="w-3.5 h-3.5" /> Image
               </TabsTrigger>
             </TabsList>
             <div className="p-6">
               <TabsContent value="summarizer">
-                <TextSummarizer />
+                <TextSummarizer onSave={saveHistory} actor={actor} />
               </TabsContent>
               <TabsContent value="chat">
-                <AIChat />
+                <AIChat onSave={saveHistory} actor={actor} />
               </TabsContent>
               <TabsContent value="generator">
-                <ContentGenerator />
+                <ContentGenerator onSave={saveHistory} actor={actor} />
+              </TabsContent>
+              <TabsContent value="code">
+                <CodeGenerator onSave={saveHistory} actor={actor} />
+              </TabsContent>
+              <TabsContent value="grammar">
+                <GrammarChecker onSave={saveHistory} actor={actor} />
+              </TabsContent>
+              <TabsContent value="voice">
+                <VoiceToText onSave={saveHistory} />
+              </TabsContent>
+              <TabsContent value="image">
+                <ImageGeneration onSave={saveHistory} />
               </TabsContent>
             </div>
           </Tabs>

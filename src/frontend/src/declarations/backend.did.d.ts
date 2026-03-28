@@ -19,23 +19,58 @@ export interface BlogPost {
   'timestamp' : Time,
   'category' : string,
 }
+export interface LicenseKey {
+  'key' : string,
+  'activatedBy' : [] | [Principal],
+  'createdAt' : Time,
+  'isActive' : boolean,
+}
+export interface AIHistoryEntry {
+  'id' : bigint,
+  'toolName' : string,
+  'input' : string,
+  'output' : string,
+  'timestamp' : Time,
+}
+export interface UserProfile {
+  'displayName' : string,
+  'bio' : string,
+  'updatedAt' : Time,
+}
+export type Principal = Principal;
 export type Time = bigint;
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'activateKey' : ActorMethod<[string], boolean>,
+  'addCustomKey' : ActorMethod<[string], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'callGroqAI' : ActorMethod<[string, string], string>,
+  'checkKeyValid' : ActorMethod<[string], boolean>,
+  'clearMyHistory' : ActorMethod<[], undefined>,
   'createBlogPost' : ActorMethod<
     [string, string, string, string, string],
     bigint
   >,
   'deleteBlogPost' : ActorMethod<[bigint], undefined>,
+  'generateKey' : ActorMethod<[], string>,
   'getAllBlogPosts' : ActorMethod<[], Array<BlogPost>>,
+  'getAllKeys' : ActorMethod<[], Array<LicenseKey>>,
   'getBlogPostById' : ActorMethod<[bigint], BlogPost>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getMyHistory' : ActorMethod<[], Array<AIHistoryEntry>>,
+  'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
+  'getUserKeys' : ActorMethod<[], Array<LicenseKey>>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'hasProStatus' : ActorMethod<[], boolean>,
   'initialize' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'revokeKey' : ActorMethod<[string], boolean>,
+  'saveAIHistory' : ActorMethod<[string, string, string], bigint>,
+  'setGroqApiKey' : ActorMethod<[string], undefined>,
+  'updateUserProfile' : ActorMethod<[string, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

@@ -23,9 +23,17 @@ export const BlogPost = IDL.Record({
   'timestamp' : Time,
   'category' : IDL.Text,
 });
+export const Principal = IDL.Principal;
+export const LicenseKey = IDL.Record({
+  'key' : IDL.Text,
+  'activatedBy' : IDL.Opt(Principal),
+  'createdAt' : Time,
+  'isActive' : IDL.Bool,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'activateKey' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createBlogPost' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -33,11 +41,16 @@ export const idlService = IDL.Service({
       [],
     ),
   'deleteBlogPost' : IDL.Func([IDL.Nat], [], []),
+  'generateKey' : IDL.Func([], [IDL.Text], []),
   'getAllBlogPosts' : IDL.Func([], [IDL.Vec(BlogPost)], ['query']),
+  'getAllKeys' : IDL.Func([], [IDL.Vec(LicenseKey)], ['query']),
   'getBlogPostById' : IDL.Func([IDL.Nat], [BlogPost], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getUserKeys' : IDL.Func([], [IDL.Vec(LicenseKey)], ['query']),
+  'hasProStatus' : IDL.Func([], [IDL.Bool], ['query']),
   'initialize' : IDL.Func([], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'revokeKey' : IDL.Func([IDL.Text], [IDL.Bool], []),
 });
 
 export const idlInitArgs = [];
@@ -58,9 +71,17 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : Time,
     'category' : IDL.Text,
   });
+  const Principal = IDL.Principal;
+  const LicenseKey = IDL.Record({
+    'key' : IDL.Text,
+    'activatedBy' : IDL.Opt(Principal),
+    'createdAt' : Time,
+    'isActive' : IDL.Bool,
+  });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'activateKey' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createBlogPost' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
@@ -68,11 +89,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'deleteBlogPost' : IDL.Func([IDL.Nat], [], []),
+    'generateKey' : IDL.Func([], [IDL.Text], []),
     'getAllBlogPosts' : IDL.Func([], [IDL.Vec(BlogPost)], ['query']),
+    'getAllKeys' : IDL.Func([], [IDL.Vec(LicenseKey)], ['query']),
     'getBlogPostById' : IDL.Func([IDL.Nat], [BlogPost], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getUserKeys' : IDL.Func([], [IDL.Vec(LicenseKey)], ['query']),
+    'hasProStatus' : IDL.Func([], [IDL.Bool], ['query']),
     'initialize' : IDL.Func([], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'revokeKey' : IDL.Func([IDL.Text], [IDL.Bool], []),
   });
 };
 

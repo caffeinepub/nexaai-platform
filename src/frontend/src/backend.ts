@@ -89,6 +89,14 @@ export class ExternalBlob {
         return this;
     }
 }
+export type Principal = Principal;
+export interface LicenseKey {
+    key: string;
+    activatedBy?: Principal;
+    createdAt: Time;
+    isActive: boolean;
+}
+export type Time = bigint;
 export interface BlogPost {
     id: bigint;
     title: string;
@@ -98,24 +106,51 @@ export interface BlogPost {
     timestamp: Time;
     category: string;
 }
-export type Time = bigint;
 export enum UserRole {
     admin = "admin",
     user = "user",
     guest = "guest"
 }
+export interface AIHistoryEntry {
+    id: bigint;
+    toolName: string;
+    input: string;
+    output: string;
+    timestamp: bigint;
+}
+export interface UserProfile {
+    displayName: string;
+    bio: string;
+    updatedAt: bigint;
+}
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    activateKey(key: string): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    checkKeyValid(key: string): Promise<boolean>;
+    addCustomKey(customKey: string): Promise<boolean>;
     createBlogPost(title: string, content: string, author: string, category: string, imageUrl: string): Promise<bigint>;
     deleteBlogPost(id: bigint): Promise<void>;
+    generateKey(): Promise<string>;
     getAllBlogPosts(): Promise<Array<BlogPost>>;
+    getAllKeys(): Promise<Array<LicenseKey>>;
     getBlogPostById(id: bigint): Promise<BlogPost>;
     getCallerUserRole(): Promise<UserRole>;
+    getUserKeys(): Promise<Array<LicenseKey>>;
+    hasProStatus(): Promise<boolean>;
     initialize(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
+    revokeKey(key: string): Promise<boolean>;
+    setGroqApiKey(key: string): Promise<void>;
+    callGroqAI(prompt: string, systemPrompt: string): Promise<string>;
+    updateUserProfile(displayName: string, bio: string): Promise<void>;
+    getUserProfile(user: Principal): Promise<UserProfile | undefined>;
+    getMyProfile(): Promise<UserProfile | undefined>;
+    saveAIHistory(toolName: string, input: string, output: string): Promise<bigint>;
+    getMyHistory(): Promise<Array<AIHistoryEntry>>;
+    clearMyHistory(): Promise<void>;
 }
-import type { UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { LicenseKey as _LicenseKey, Principal as _Principal, Time as _Time, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
@@ -129,6 +164,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor._initializeAccessControlWithSecret(arg0);
+            return result;
+        }
+    }
+    async activateKey(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.activateKey(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.activateKey(arg0);
             return result;
         }
     }
@@ -174,6 +223,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async generateKey(): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.generateKey();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.generateKey();
+            return result;
+        }
+    }
     async getAllBlogPosts(): Promise<Array<BlogPost>> {
         if (this.processError) {
             try {
@@ -186,6 +249,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getAllBlogPosts();
             return result;
+        }
+    }
+    async getAllKeys(): Promise<Array<LicenseKey>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllKeys();
+                return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllKeys();
+            return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
         }
     }
     async getBlogPostById(arg0: bigint): Promise<BlogPost> {
@@ -206,14 +283,42 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserRole();
-                return from_candid_UserRole_n3(this._uploadFile, this._downloadFile, result);
+                return from_candid_UserRole_n7(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserRole();
-            return from_candid_UserRole_n3(this._uploadFile, this._downloadFile, result);
+            return from_candid_UserRole_n7(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getUserKeys(): Promise<Array<LicenseKey>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUserKeys();
+                return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUserKeys();
+            return from_candid_vec_n3(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async hasProStatus(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.hasProStatus();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.hasProStatus();
+            return result;
         }
     }
     async initialize(): Promise<void> {
@@ -244,11 +349,86 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async revokeKey(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.revokeKey(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.revokeKey(arg0);
+            return result;
+        }
+    }
+    async checkKeyValid(arg0: string): Promise<boolean> {
+        const result = await this.actor.checkKeyValid(arg0);
+        return result;
+    }
+    async addCustomKey(arg0: string): Promise<boolean> {
+        const result = await this.actor.addCustomKey(arg0);
+        return result;
+    }
+    async setGroqApiKey(arg0: string): Promise<void> {
+        await this.actor.setGroqApiKey(arg0);
+    }
+    async callGroqAI(arg0: string, arg1: string): Promise<string> {
+        const result = await this.actor.callGroqAI(arg0, arg1);
+        return result;
+    }
+    async updateUserProfile(arg0: string, arg1: string): Promise<void> {
+        await this.actor.updateUserProfile(arg0, arg1);
+    }
+    async getUserProfile(arg0: any): Promise<any> {
+        const result = await this.actor.getUserProfile(arg0);
+        return result.length === 0 ? undefined : result[0];
+    }
+    async getMyProfile(): Promise<any> {
+        const result = await this.actor.getMyProfile();
+        return result.length === 0 ? undefined : result[0];
+    }
+    async saveAIHistory(arg0: string, arg1: string, arg2: string): Promise<bigint> {
+        const result = await this.actor.saveAIHistory(arg0, arg1, arg2);
+        return result;
+    }
+    async getMyHistory(): Promise<Array<any>> {
+        const result = await this.actor.getMyHistory();
+        return result;
+    }
+    async clearMyHistory(): Promise<void> {
+        await this.actor.clearMyHistory();
+    }
 }
-function from_candid_UserRole_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
-    return from_candid_variant_n4(_uploadFile, _downloadFile, value);
+function from_candid_LicenseKey_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _LicenseKey): LicenseKey {
+    return from_candid_record_n5(_uploadFile, _downloadFile, value);
 }
-function from_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_UserRole_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n8(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Principal]): Principal | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    key: string;
+    activatedBy: [] | [_Principal];
+    createdAt: _Time;
+    isActive: boolean;
+}): {
+    key: string;
+    activatedBy?: Principal;
+    createdAt: Time;
+    isActive: boolean;
+} {
+    return {
+        key: value.key,
+        activatedBy: record_opt_to_undefined(from_candid_opt_n6(_uploadFile, _downloadFile, value.activatedBy)),
+        createdAt: value.createdAt,
+        isActive: value.isActive
+    };
+}
+function from_candid_variant_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     admin: null;
 } | {
     user: null;
@@ -256,6 +436,9 @@ function from_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uin
     guest: null;
 }): UserRole {
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
+}
+function from_candid_vec_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_LicenseKey>): Array<LicenseKey> {
+    return value.map((x)=>from_candid_LicenseKey_n4(_uploadFile, _downloadFile, x));
 }
 function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n2(_uploadFile, _downloadFile, value);

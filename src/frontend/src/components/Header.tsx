@@ -1,13 +1,16 @@
 import { Button } from "@/components/ui/button";
-import { Link } from "@tanstack/react-router";
-import { Menu, X, Zap } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Menu, Moon, Sun, UserCircle, X, Zap } from "lucide-react";
 import { useState } from "react";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { getCurrentUser, logout } from "../hooks/useAuth";
+import { useTheme } from "../hooks/useTheme";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { identity, clear } = useInternetIdentity();
-  const isAuthenticated = !!identity;
+  const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  const currentUser = getCurrentUser();
+  const isAuthenticated = !!currentUser;
 
   const navLinks = [
     { label: "Home", to: "/" },
@@ -16,10 +19,20 @@ export default function Header() {
     { label: "Contact", to: "/contact" },
   ];
 
+  const handleLogout = () => {
+    logout();
+    setMobileOpen(false);
+    navigate({ to: "/" });
+  };
+
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 border-b border-white/10"
-      style={{ background: "rgba(7,10,18,0.92)", backdropFilter: "blur(12px)" }}
+      style={{
+        background:
+          theme === "light" ? "rgba(248,249,255,0.92)" : "rgba(7,10,18,0.92)",
+        backdropFilter: "blur(12px)",
+      }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
@@ -49,28 +62,65 @@ export default function Header() {
             </Link>
           ))}
           {isAuthenticated && (
-            <Link
-              to="/dashboard"
-              className="text-[#A8B0C4] hover:text-[#F2F5FF] transition-colors text-sm font-medium"
-              data-ocid="header.link"
-            >
-              Dashboard
-            </Link>
+            <>
+              <Link
+                to="/dashboard"
+                className="text-[#A8B0C4] hover:text-[#F2F5FF] transition-colors text-sm font-medium"
+                data-ocid="header.link"
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/profile"
+                className="text-[#A8B0C4] hover:text-[#F2F5FF] transition-colors text-sm font-medium"
+                data-ocid="header.link"
+              >
+                Profile
+              </Link>
+            </>
           )}
         </nav>
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Theme Toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-lg text-[#A8B0C4] hover:text-[#F2F5FF] hover:bg-white/10 transition-colors"
+            aria-label="Toggle theme"
+            data-ocid="header.toggle"
+          >
+            {theme === "dark" ? (
+              <Sun className="w-4 h-4" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
+          </button>
+
           {isAuthenticated ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-white/20 text-[#F2F5FF] hover:bg-white/10"
-              onClick={clear}
-              data-ocid="header.secondary_button"
-            >
-              Log Out
-            </Button>
+            <>
+              <Link to="/profile">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/20 text-[#F2F5FF] hover:bg-white/10"
+                  data-ocid="header.secondary_button"
+                >
+                  <UserCircle className="w-4 h-4 mr-1" />
+                  {currentUser?.name || "Profile"}
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/20 text-[#F2F5FF] hover:bg-white/10"
+                onClick={handleLogout}
+                data-ocid="header.secondary_button"
+              >
+                Log Out
+              </Button>
+            </>
           ) : (
             <>
               <Link to="/login">
@@ -96,25 +146,45 @@ export default function Header() {
           )}
         </div>
 
-        {/* Mobile Toggle */}
-        <button
-          type="button"
-          className="md:hidden text-[#F2F5FF]"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
-          data-ocid="header.toggle"
-        >
-          {mobileOpen ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <Menu className="w-5 h-5" />
-          )}
-        </button>
+        {/* Mobile: theme + hamburger */}
+        <div className="md:hidden flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-lg text-[#A8B0C4] hover:text-[#F2F5FF] transition-colors"
+            aria-label="Toggle theme"
+            data-ocid="header.toggle"
+          >
+            {theme === "dark" ? (
+              <Sun className="w-4 h-4" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="text-[#F2F5FF]"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Toggle menu"
+            data-ocid="header.toggle"
+          >
+            {mobileOpen ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-white/10 bg-[#070A12] px-4 py-4 flex flex-col gap-3">
+        <div
+          className="md:hidden border-t border-white/10 px-4 py-4 flex flex-col gap-3"
+          style={{
+            background: theme === "light" ? "#F8F9FF" : "#070A12",
+          }}
+        >
           {navLinks.map((link) => (
             <Link
               key={link.to}
@@ -136,9 +206,17 @@ export default function Header() {
               >
                 Dashboard
               </Link>
+              <Link
+                to="/profile"
+                className="text-[#A8B0C4] hover:text-[#F2F5FF] py-2 text-sm"
+                onClick={() => setMobileOpen(false)}
+                data-ocid="header.link"
+              >
+                Profile
+              </Link>
               <button
                 type="button"
-                onClick={clear}
+                onClick={handleLogout}
                 className="text-left text-[#A8B0C4] hover:text-[#F2F5FF] py-2 text-sm"
                 data-ocid="header.secondary_button"
               >

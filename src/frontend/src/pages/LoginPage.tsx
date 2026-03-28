@@ -1,17 +1,35 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Loader2, Zap } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect } from "react";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useState } from "react";
+import { login } from "../hooks/useAuth";
 
 export default function LoginPage() {
-  const { login, isLoggingIn, identity } = useInternetIdentity();
   const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (identity) navigate({ to: "/dashboard" });
-  }, [identity, navigate]);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!email.trim() || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
+    setLoading(true);
+    await new Promise((r) => setTimeout(r, 400));
+    const ok = login(email.trim(), password);
+    setLoading(false);
+    if (!ok) {
+      setError("Invalid email or password.");
+      return;
+    }
+    navigate({ to: "/dashboard" });
+  };
 
   return (
     <div className="min-h-screen bg-[#070A12] flex items-center justify-center px-4">
@@ -39,33 +57,75 @@ export default function LoginPage() {
         </div>
 
         <div className="p-8 rounded-2xl border border-white/10 bg-[#11182A]">
-          <div className="mb-6 p-4 rounded-xl bg-[#8B5CF6]/10 border border-[#8B5CF6]/20">
-            <p className="text-[#A8B0C4] text-sm text-center">
-              NexaAI uses{" "}
-              <strong className="text-[#F2F5FF]">Internet Identity</strong> for
-              secure, password-free authentication.
-            </p>
-          </div>
-
-          <Button
-            onClick={login}
-            disabled={isLoggingIn}
-            className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 h-11"
-            data-ocid="login.primary_button"
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4"
+            data-ocid="login.modal"
           >
-            {isLoggingIn ? (
-              <>
-                <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Connecting...
-              </>
-            ) : (
-              <>
-                Sign In <ArrowRight className="ml-2 w-4 h-4" />
-              </>
+            <div>
+              <label
+                className="block text-[#A8B0C4] text-sm mb-1.5"
+                htmlFor="login-email"
+              >
+                Email
+              </label>
+              <Input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus:border-[#8B5CF6]/50"
+                data-ocid="login.input"
+              />
+            </div>
+            <div>
+              <label
+                className="block text-[#A8B0C4] text-sm mb-1.5"
+                htmlFor="login-password"
+              >
+                Password
+              </label>
+              <Input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus:border-[#8B5CF6]/50"
+                data-ocid="login.input"
+              />
+            </div>
+
+            {error && (
+              <p className="text-red-400 text-sm" data-ocid="login.error_state">
+                {error}
+              </p>
             )}
-          </Button>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 h-11 mt-2"
+              data-ocid="login.primary_button"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Signing
+                  in...
+                </>
+              ) : (
+                <>
+                  Sign In <ArrowRight className="ml-2 w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </form>
 
           <p className="text-center text-[#A8B0C4] text-sm mt-5">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link
               to="/register"
               className="text-[#8B5CF6] hover:underline"
