@@ -102,6 +102,10 @@ function NewKeyBox({ keyValue }: { keyValue: string }) {
 export default function AdminPage() {
   const { actor, isFetching } = useActor();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  // If caffeineAdminToken is in URL, the actor is already initialized with admin rights
+  const hasCaffeineToken =
+    typeof window !== "undefined" &&
+    window.location.hash.includes("caffeineAdminToken");
   const [keys, setKeys] = useState<LicenseKey[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [generatingKey, setGeneratingKey] = useState(false);
@@ -119,23 +123,36 @@ export default function AdminPage() {
   }, [actor, isFetching]);
 
   useEffect(() => {
-    if (!isAdmin || !actor) return;
+    if ((!isAdmin && !hasCaffeineToken) || !actor || isFetching) return;
     setLoadingKeys(true);
     actor
       .getAllKeys()
       .then(setKeys)
+      .catch(() => setKeys([]))
       .finally(() => setLoadingKeys(false));
-  }, [isAdmin, actor]);
+  }, [isAdmin, hasCaffeineToken, actor, isFetching]);
 
   const handleInitialize = async () => {
     if (!actor) return;
     setInitializing(true);
     try {
       await (actor as any).initialize();
-      toast.success("App initialized! You are now admin. Refreshing...");
-      setTimeout(() => window.location.reload(), 1500);
-    } catch {
-      toast.error("Initialization failed.");
+      toast.success("Initialized! AYAN key seeded. Loading admin panel...");
+      // Re-check admin status after initialize
+      const adminStatus = await actor.isCallerAdmin();
+      setIsAdmin(adminStatus);
+      if (adminStatus) {
+        setLoadingKeys(true);
+        actor
+          .getAllKeys()
+          .then(setKeys)
+          .catch(() => setKeys([]))
+          .finally(() => setLoadingKeys(false));
+      }
+    } catch (e: any) {
+      toast.error(
+        `Initialization failed: ${(e as any)?.message || "unknown error"}`,
+      );
     } finally {
       setInitializing(false);
     }
@@ -243,7 +260,7 @@ export default function AdminPage() {
   }
 
   // Still checking
-  if (isAdmin === null) {
+  if (isAdmin === null && !hasCaffeineToken) {
     return (
       <div className="min-h-screen bg-[#070A12] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#8B5CF6]" />
@@ -251,8 +268,8 @@ export default function AdminPage() {
     );
   }
 
-  // Logged in but not admin -- show First Time Setup
-  if (isAdmin === false) {
+  // Logged in but not admin (and no token) -- show First Time Setup
+  if (isAdmin === false && !hasCaffeineToken) {
     return (
       <div className="min-h-screen bg-[#070A12] flex items-center justify-center px-4">
         <motion.div
@@ -306,6 +323,41 @@ export default function AdminPage() {
             </Button>
           </div>
 
+          {/* Groq API Key in setup screen */}
+          <div className="p-5 rounded-2xl border border-[#8B5CF6]/30 bg-[#11182A] mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <KeyRound className="w-4 h-4 text-[#8B5CF6]" />
+              <h3 className="font-heading font-semibold text-[#F2F5FF] text-base">
+                Set Groq API Key
+              </h3>
+            </div>
+            <p className="text-[#A8B0C4] text-xs mb-3">
+              Paste your Groq key (from console.groq.com) -- saves permanently
+              for all AI tools.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                value={groqKeyInput}
+                onChange={(e) => setGroqKeyInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveGroqKey()}
+                placeholder="gsk_..."
+                className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus-visible:ring-[#8B5CF6]/50 flex-1 text-sm"
+              />
+              <Button
+                onClick={handleSaveGroqKey}
+                disabled={savingGroqKey || !groqKeyInput.trim()}
+                className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 shrink-0 text-sm"
+              >
+                {savingGroqKey ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Save Key"
+                )}
+              </Button>
+            </div>
+          </div>
+
           <div className="text-center">
             <Link to="/dashboard">
               <Button
@@ -323,6 +375,8 @@ export default function AdminPage() {
 
   const activeCount = keys.filter((k) => k.isActive).length;
   const totalCount = keys.length;
+  const showInitBanner =
+    isAdmin === false || (hasCaffeineToken && isAdmin === null);
 
   return (
     <div className="min-h-screen bg-[#070A12] text-[#F2F5FF]">
@@ -382,7 +436,9 @@ export default function AdminPage() {
               </h2>
             </div>
             <p className="text-[#A8B0C4] text-sm mb-4">
-              Re-seed the AYAN license key if needed
+              {showInitBanner
+                ? "Click Initialize to become admin and seed the AYAN license key."
+                : "Re-seed the AYAN license key if needed."}
             </p>
             <Button
               onClick={handleInitialize}
