@@ -16,13 +16,12 @@ import {
   KeyRound,
   Loader2,
   Plus,
-  Rocket,
   Shield,
   Trash2,
   Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { LicenseKey } from "../backend.d";
 import { useActor } from "../hooks/useActor";
@@ -31,13 +30,11 @@ import { isAuthenticated } from "../hooks/useAuth";
 function CopyableKey({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const short = `${value.slice(0, 14)}...${value.slice(-6)}`;
-
   const copy = () => {
     navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
-
   return (
     <button
       type="button"
@@ -58,14 +55,12 @@ function CopyableKey({ value }: { value: string }) {
 
 function NewKeyBox({ keyValue }: { keyValue: string }) {
   const [copied, setCopied] = useState(false);
-
   const copy = () => {
     navigator.clipboard.writeText(keyValue);
     setCopied(true);
     toast.success("Key copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
   };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
@@ -102,10 +97,6 @@ function NewKeyBox({ keyValue }: { keyValue: string }) {
 export default function AdminPage() {
   const { actor, isFetching } = useActor();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
-  const hasCaffeineToken =
-    typeof window !== "undefined" &&
-    window.location.hash.includes("caffeineAdminToken");
   const [keys, setKeys] = useState<LicenseKey[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [generatingKey, setGeneratingKey] = useState(false);
@@ -115,96 +106,42 @@ export default function AdminPage() {
   const [addingCustomKey, setAddingCustomKey] = useState(false);
   const [groqKeyInput, setGroqKeyInput] = useState("");
   const [savingGroqKey, setSavingGroqKey] = useState(false);
-  const [initializing, setInitializing] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!actor || isFetching) return;
-
-    // 8-second timeout fallback
-    timeoutRef.current = setTimeout(() => {
-      setIsAdmin((prev) => (prev === null ? false : prev));
-      setCheckingAdmin(false);
-    }, 8000);
-
     actor
       .isCallerAdmin()
-      .then((result) => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setIsAdmin(result);
-        setCheckingAdmin(false);
-      })
-      .catch(() => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setIsAdmin(false);
-        setCheckingAdmin(false);
-      });
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
+      .then((result) => setIsAdmin(result))
+      .catch(() => setIsAdmin(false));
   }, [actor, isFetching]);
 
   useEffect(() => {
-    if ((!isAdmin && !hasCaffeineToken) || !actor || isFetching) return;
+    if (!isAdmin || !actor) return;
     setLoadingKeys(true);
     actor
       .getAllKeys()
       .then(setKeys)
       .catch(() => setKeys([]))
       .finally(() => setLoadingKeys(false));
-  }, [isAdmin, hasCaffeineToken, actor, isFetching]);
-
-  const handleInitialize = async () => {
-    if (!actor) return;
-    setInitializing(true);
-    try {
-      await (actor as any).initialize();
-      const adminStatus = await actor.isCallerAdmin();
-      setIsAdmin(adminStatus);
-      if (adminStatus) {
-        // Auto-save Groq key if one was typed in
-        if (groqKeyInput.trim()) {
-          try {
-            await (actor as any).setGroqApiKey(groqKeyInput.trim());
-            toast.success("Initialized! AYAN key seeded & Groq API key saved.");
-            setGroqKeyInput("");
-          } catch {
-            toast.success(
-              "Initialized! AYAN key seeded. Loading admin panel...",
-            );
-            toast.error("Groq API key could not be saved. Try saving again.");
-          }
-        } else {
-          toast.success("Initialized! AYAN key seeded. Loading admin panel...");
-        }
-        setLoadingKeys(true);
-        actor
-          .getAllKeys()
-          .then(setKeys)
-          .catch(() => setKeys([]))
-          .finally(() => setLoadingKeys(false));
-      } else {
-        toast.success("Initialized! AYAN key seeded. Loading admin panel...");
-      }
-    } catch (e: any) {
-      toast.error(
-        `Initialization failed: ${(e as any)?.message || "unknown error"}`,
-      );
-    } finally {
-      setInitializing(false);
-    }
-  };
+  }, [isAdmin, actor]);
 
   const handleSaveGroqKey = async () => {
     if (!actor || !groqKeyInput.trim()) return;
     setSavingGroqKey(true);
     try {
+      // setGroqApiKey auto-initializes on backend if first time
       await (actor as any).setGroqApiKey(groqKeyInput.trim());
-      toast.success("Groq API key updated!");
+      toast.success("Groq API key saved! AI tools are now active.");
       setGroqKeyInput("");
+      // After saving, check admin status and load keys
+      const adminStatus = await actor.isCallerAdmin();
+      setIsAdmin(adminStatus);
+      if (adminStatus) {
+        const updatedKeys = await actor.getAllKeys();
+        setKeys(updatedKeys);
+      }
     } catch {
-      toast.error("Failed to save Groq API key.");
+      toast.error("Failed to save Groq API key. Please try again.");
     } finally {
       setSavingGroqKey(false);
     }
@@ -275,7 +212,6 @@ export default function AdminPage() {
 
   const truncatePrincipal = (p: string) => `${p.slice(0, 8)}...${p.slice(-5)}`;
 
-  // Not logged in
   if (!isAuthenticated()) {
     return (
       <div className="min-h-screen bg-[#070A12] flex items-center justify-center">
@@ -299,8 +235,6 @@ export default function AdminPage() {
 
   const activeCount = keys.filter((k) => k.isActive).length;
   const totalCount = keys.length;
-  const showAdminContent = isAdmin === true || hasCaffeineToken;
-  const showSetupContent = isAdmin === false && !hasCaffeineToken;
 
   return (
     <div className="min-h-screen bg-[#070A12] text-[#F2F5FF]">
@@ -351,64 +285,8 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Inline checking banner */}
-          {checkingAdmin && isAdmin === null && (
-            <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-[#11182A] text-[#A8B0C4] text-sm">
-              <Loader2 className="w-4 h-4 animate-spin text-[#8B5CF6] shrink-0" />
-              <span>Checking admin status...</span>
-            </div>
-          )}
-
-          {/* Initialize App -- always visible */}
-          <div className="mb-8 p-6 rounded-2xl border border-white/10 bg-[#11182A]">
-            <div className="flex items-center gap-3 mb-1">
-              <Rocket className="w-5 h-5 text-[#22D3EE]" />
-              <h2 className="font-heading font-semibold text-[#F2F5FF] text-lg">
-                Initialize App
-              </h2>
-            </div>
-            <p className="text-[#A8B0C4] text-sm mb-4">
-              {showSetupContent
-                ? "Click Initialize to become admin and seed the AYAN license key."
-                : "Re-seed the AYAN license key if needed."}
-            </p>
-            {showSetupContent && (
-              <ul className="text-[#A8B0C4] text-sm space-y-2 mb-5">
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400" /> Assign you as
-                  admin
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400" /> Seed AYAN
-                  license key
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400" /> Unlock full
-                  admin panel
-                </li>
-              </ul>
-            )}
-            <Button
-              onClick={handleInitialize}
-              disabled={initializing}
-              className="bg-gradient-to-r from-[#22D3EE] to-[#8B5CF6] text-white border-0 hover:opacity-90"
-              data-ocid="admin.primary_button"
-            >
-              {initializing ? (
-                <>
-                  <Loader2 className="mr-2 w-4 h-4 animate-spin" />{" "}
-                  Initializing...
-                </>
-              ) : (
-                <>
-                  <Rocket className="mr-2 w-4 h-4" /> Initialize
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Groq API Key -- always visible */}
-          <div className="mb-8 p-6 rounded-2xl border border-white/10 bg-[#11182A]">
+          {/* Groq API Key -- always shown, auto-initializes on save */}
+          <div className="mb-8 p-6 rounded-2xl border border-[#8B5CF6]/30 bg-[#11182A]">
             <div className="flex items-center gap-3 mb-1">
               <KeyRound className="w-5 h-5 text-[#8B5CF6]" />
               <h2 className="font-heading font-semibold text-[#F2F5FF] text-lg">
@@ -416,26 +294,31 @@ export default function AdminPage() {
               </h2>
             </div>
             <p className="text-[#A8B0C4] text-sm mb-4">
-              Paste your Groq key (from console.groq.com) — saves permanently
-              for all AI tools.
+              Paste your Groq key from{" "}
+              <a
+                href="https://console.groq.com"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#22D3EE] hover:underline"
+              >
+                console.groq.com
+              </a>{" "}
+              -- saves permanently and activates all AI tools. First save also
+              sets you as admin.
             </p>
             <div className="flex items-center gap-3">
               <Input
                 type="password"
                 value={groqKeyInput}
                 onChange={(e) => setGroqKeyInput(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && isAdmin === true && handleSaveGroqKey()
-                }
+                onKeyDown={(e) => e.key === "Enter" && handleSaveGroqKey()}
                 placeholder="gsk_..."
                 className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus-visible:ring-[#8B5CF6]/50 flex-1"
                 data-ocid="admin.input"
               />
               <Button
                 onClick={handleSaveGroqKey}
-                disabled={
-                  savingGroqKey || !groqKeyInput.trim() || isAdmin !== true
-                }
+                disabled={savingGroqKey || !groqKeyInput.trim()}
                 className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 shrink-0"
                 data-ocid="admin.save_button"
               >
@@ -450,17 +333,11 @@ export default function AdminPage() {
                 )}
               </Button>
             </div>
-            {isAdmin === false && (
-              <p className="text-amber-400 text-xs mt-2">
-                ⚠ Initialize the app above first, then save your Groq key.
-              </p>
-            )}
           </div>
 
-          {/* Admin-only content */}
-          {showAdminContent && (
+          {/* License key management -- shown only after admin confirmed */}
+          {isAdmin && (
             <>
-              {/* Stats Row */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
                 <div className="p-4 rounded-xl border border-white/10 bg-[#11182A]">
                   <p className="text-[#A8B0C4] text-xs uppercase tracking-wider">
@@ -488,7 +365,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Generate Key */}
               <div className="mb-8 p-6 rounded-2xl border border-white/10 bg-[#11182A]">
                 <h2 className="font-heading font-semibold text-[#F2F5FF] text-lg mb-1">
                   Generate License Key
@@ -546,7 +422,6 @@ export default function AdminPage() {
                 {newKey && <NewKeyBox keyValue={newKey} />}
               </div>
 
-              {/* Keys Table */}
               <div
                 className="rounded-2xl border border-white/10 bg-[#11182A] overflow-hidden"
                 data-ocid="admin.table"
@@ -556,17 +431,11 @@ export default function AdminPage() {
                     All License Keys
                   </h2>
                   {loadingKeys && (
-                    <Loader2
-                      className="w-4 h-4 animate-spin text-[#8B5CF6]"
-                      data-ocid="admin.loading_state"
-                    />
+                    <Loader2 className="w-4 h-4 animate-spin text-[#8B5CF6]" />
                   )}
                 </div>
                 {keys.length === 0 && !loadingKeys ? (
-                  <div
-                    className="py-16 text-center"
-                    data-ocid="admin.empty_state"
-                  >
+                  <div className="py-16 text-center">
                     <KeyRound className="w-10 h-10 text-[#A8B0C4]/30 mx-auto mb-3" />
                     <p className="text-[#A8B0C4] text-sm">
                       No keys generated yet.
