@@ -377,6 +377,59 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Behind the Platform Gallery */}
+        <section className="py-20 px-4 sm:px-6 bg-[#0B1020]">
+          <div className="max-w-7xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="text-center mb-12"
+            >
+              <h2 className="font-heading font-bold text-3xl sm:text-4xl text-[#F2F5FF] mb-4">
+                Behind the Platform
+              </h2>
+              <p className="text-[#A8B0C4] text-lg max-w-xl mx-auto">
+                The people and moments that shaped NexaAI.
+              </p>
+            </motion.div>
+            <div className="columns-2 sm:columns-3 lg:columns-4 gap-4 space-y-4">
+              {[
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.05_pm-019d341e-b2ae-72d0-a3e7-9ddc7fdeca5a-1.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.09_pm_1-019d3421-ad5b-70bf-ae97-3f0a63eebb38-2.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.06_pm-019d3367-bea2-7746-8421-40dae7dff139-1.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.06_pm_1-019d3367-d1a9-7149-a884-27e163ef6cbd-2.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.07_pm-019d3367-fac3-776f-8e05-2493a0bbc3ef-3.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.07_pm_1-019d3367-fb4b-75d9-aab1-c80e87ea1a2f-4.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.45.56_pm-019d3368-099d-75ae-824e-a5788f889e92-5.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.45.56_pm_2-019d3368-0c1b-73ea-a886-7a2f16996f4f-6.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.08_pm-019d3368-29e5-7012-a3fa-c9aaa1291fb7-7.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.45.56_pm_1-019d3368-29d0-7054-ae4e-abb12a1a591c-8.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.08_pm_1-019d3368-2a55-7489-bb37-f9d7358f41af-9.jpeg",
+                "/assets/uploads/lolwhatsapp_image_2026-03-25_at_11.50.55_pm_1_.png-019d3368-2f56-76cf-88c5-cd73e13059a8-10.jpeg",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.09_pm_1-019d3368-34bb-70b5-b908-4d6eb50b87ec-11.jpeg",
+                "/assets/uploads/eshal_whatsapp_image_2026-03-25_at_11.45.56_pm_1-019d3368-c2e0-777d-8163-bf658f1aab86-12.png",
+              ].map((src) => (
+                <motion.div
+                  key={src}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4 }}
+                  className="break-inside-avoid mb-4 rounded-xl overflow-hidden border-2 border-transparent bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] p-[2px] hover:scale-[1.02] transition-transform duration-300"
+                >
+                  <img
+                    src={src}
+                    alt="Behind the platform"
+                    className="w-full rounded-[10px] object-cover block"
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* CTA */}
         <section className="py-24 px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center">

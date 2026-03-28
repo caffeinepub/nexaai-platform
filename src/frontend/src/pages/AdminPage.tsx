@@ -160,16 +160,32 @@ export default function AdminPage() {
     setInitializing(true);
     try {
       await (actor as any).initialize();
-      toast.success("Initialized! AYAN key seeded. Loading admin panel...");
       const adminStatus = await actor.isCallerAdmin();
       setIsAdmin(adminStatus);
       if (adminStatus) {
+        // Auto-save Groq key if one was typed in
+        if (groqKeyInput.trim()) {
+          try {
+            await (actor as any).setGroqApiKey(groqKeyInput.trim());
+            toast.success("Initialized! AYAN key seeded & Groq API key saved.");
+            setGroqKeyInput("");
+          } catch {
+            toast.success(
+              "Initialized! AYAN key seeded. Loading admin panel...",
+            );
+            toast.error("Groq API key could not be saved. Try saving again.");
+          }
+        } else {
+          toast.success("Initialized! AYAN key seeded. Loading admin panel...");
+        }
         setLoadingKeys(true);
         actor
           .getAllKeys()
           .then(setKeys)
           .catch(() => setKeys([]))
           .finally(() => setLoadingKeys(false));
+      } else {
+        toast.success("Initialized! AYAN key seeded. Loading admin panel...");
       }
     } catch (e: any) {
       toast.error(
@@ -408,14 +424,18 @@ export default function AdminPage() {
                 type="password"
                 value={groqKeyInput}
                 onChange={(e) => setGroqKeyInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSaveGroqKey()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && isAdmin === true && handleSaveGroqKey()
+                }
                 placeholder="gsk_..."
                 className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus-visible:ring-[#8B5CF6]/50 flex-1"
                 data-ocid="admin.input"
               />
               <Button
                 onClick={handleSaveGroqKey}
-                disabled={savingGroqKey || !groqKeyInput.trim()}
+                disabled={
+                  savingGroqKey || !groqKeyInput.trim() || isAdmin !== true
+                }
                 className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 shrink-0"
                 data-ocid="admin.save_button"
               >
@@ -430,6 +450,11 @@ export default function AdminPage() {
                 )}
               </Button>
             </div>
+            {isAdmin === false && (
+              <p className="text-amber-400 text-xs mt-2">
+                ⚠ Initialize the app above first, then save your Groq key.
+              </p>
+            )}
           </div>
 
           {/* Admin-only content */}
