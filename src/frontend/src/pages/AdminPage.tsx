@@ -106,6 +106,7 @@ export default function AdminPage() {
   const [addingCustomKey, setAddingCustomKey] = useState(false);
   const [groqKeyInput, setGroqKeyInput] = useState("");
   const [savingGroqKey, setSavingGroqKey] = useState(false);
+  const [groqSaved, setGroqSaved] = useState(false);
 
   useEffect(() => {
     if (!actor || isFetching) return;
@@ -129,11 +130,18 @@ export default function AdminPage() {
     if (!actor || !groqKeyInput.trim()) return;
     setSavingGroqKey(true);
     try {
-      // setGroqApiKey auto-initializes on backend if first time
       await (actor as any).setGroqApiKey(groqKeyInput.trim());
       toast.success("Groq API key saved! AI tools are now active.");
       setGroqKeyInput("");
-      // After saving, check admin status and load keys
+      setGroqSaved(true);
+    } catch (err) {
+      console.error("setGroqApiKey error:", err);
+      toast.error("Failed to reach backend. Please try again.");
+    } finally {
+      setSavingGroqKey(false);
+    }
+    // Refresh admin status separately -- don't let this affect save result
+    try {
       const adminStatus = await actor.isCallerAdmin();
       setIsAdmin(adminStatus);
       if (adminStatus) {
@@ -141,9 +149,7 @@ export default function AdminPage() {
         setKeys(updatedKeys);
       }
     } catch {
-      toast.error("Failed to save Groq API key. Please try again.");
-    } finally {
-      setSavingGroqKey(false);
+      // ignore -- admin status refresh failure shouldn't affect UX
     }
   };
 
@@ -285,7 +291,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Groq API Key -- always shown, auto-initializes on save */}
+          {/* Groq API Key -- always shown to logged-in users, no admin check */}
           <div className="mb-8 p-6 rounded-2xl border border-[#8B5CF6]/30 bg-[#11182A]">
             <div className="flex items-center gap-3 mb-1">
               <KeyRound className="w-5 h-5 text-[#8B5CF6]" />
@@ -303,9 +309,14 @@ export default function AdminPage() {
               >
                 console.groq.com
               </a>{" "}
-              -- saves permanently and activates all AI tools. First save also
-              sets you as admin.
+              -- saves permanently and activates all AI tools.
             </p>
+            {groqSaved && (
+              <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
+                <Check className="w-4 h-4 shrink-0" />
+                Groq API key saved successfully! AI tools are now active.
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <Input
                 type="password"
