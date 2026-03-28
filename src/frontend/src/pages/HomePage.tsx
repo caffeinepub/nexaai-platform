@@ -410,6 +410,7 @@ export default function HomePage() {
                 "/assets/uploads/lolwhatsapp_image_2026-03-25_at_11.50.55_pm_1_.png-019d3368-2f56-76cf-88c5-cd73e13059a8-10.jpeg",
                 "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.09_pm_1-019d3368-34bb-70b5-b908-4d6eb50b87ec-11.jpeg",
                 "/assets/uploads/eshal_whatsapp_image_2026-03-25_at_11.45.56_pm_1-019d3368-c2e0-777d-8163-bf658f1aab86-12.png",
+                "/assets/uploads/whatsapp_image_2026-03-25_at_11.46.09_pm_1-019d3429-83a3-7348-9dfc-b3344c950f7f-1.jpeg",
               ].map((src) => (
                 <motion.div
                   key={src}
