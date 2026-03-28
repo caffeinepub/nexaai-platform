@@ -22,7 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { LicenseKey } from "../backend.d";
 import { useActor } from "../hooks/useActor";
@@ -102,7 +102,7 @@ function NewKeyBox({ keyValue }: { keyValue: string }) {
 export default function AdminPage() {
   const { actor, isFetching } = useActor();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  // If caffeineAdminToken is in URL, the actor is already initialized with admin rights
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
   const hasCaffeineToken =
     typeof window !== "undefined" &&
     window.location.hash.includes("caffeineAdminToken");
@@ -116,10 +116,33 @@ export default function AdminPage() {
   const [groqKeyInput, setGroqKeyInput] = useState("");
   const [savingGroqKey, setSavingGroqKey] = useState(false);
   const [initializing, setInitializing] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!actor || isFetching) return;
-    actor.isCallerAdmin().then(setIsAdmin);
+
+    // 8-second timeout fallback
+    timeoutRef.current = setTimeout(() => {
+      setIsAdmin((prev) => (prev === null ? false : prev));
+      setCheckingAdmin(false);
+    }, 8000);
+
+    actor
+      .isCallerAdmin()
+      .then((result) => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setIsAdmin(result);
+        setCheckingAdmin(false);
+      })
+      .catch(() => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setIsAdmin(false);
+        setCheckingAdmin(false);
+      });
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, [actor, isFetching]);
 
   useEffect(() => {
@@ -138,7 +161,6 @@ export default function AdminPage() {
     try {
       await (actor as any).initialize();
       toast.success("Initialized! AYAN key seeded. Loading admin panel...");
-      // Re-check admin status after initialize
       const adminStatus = await actor.isCallerAdmin();
       setIsAdmin(adminStatus);
       if (adminStatus) {
@@ -259,124 +281,10 @@ export default function AdminPage() {
     );
   }
 
-  // Still checking
-  if (isAdmin === null && !hasCaffeineToken) {
-    return (
-      <div className="min-h-screen bg-[#070A12] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#8B5CF6]" />
-      </div>
-    );
-  }
-
-  // Logged in but not admin (and no token) -- show First Time Setup
-  if (isAdmin === false && !hasCaffeineToken) {
-    return (
-      <div className="min-h-screen bg-[#070A12] flex items-center justify-center px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md"
-        >
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] flex items-center justify-center mx-auto mb-4">
-              <Rocket className="w-8 h-8 text-white" />
-            </div>
-            <h2 className="text-[#F2F5FF] font-heading font-bold text-2xl mb-2">
-              First Time Setup
-            </h2>
-            <p className="text-[#A8B0C4] text-sm">
-              Click Initialize to become admin and seed the AYAN license key.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#11182A] mb-4">
-            <p className="text-[#A8B0C4] text-sm mb-4">This will:</p>
-            <ul className="text-[#A8B0C4] text-sm space-y-2 mb-6">
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400" /> Assign you as
-                admin
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400" /> Seed AYAN license
-                key
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400" /> Unlock full admin
-                panel
-              </li>
-            </ul>
-            <Button
-              onClick={handleInitialize}
-              disabled={initializing}
-              className="w-full bg-gradient-to-r from-[#22D3EE] to-[#8B5CF6] text-white border-0 hover:opacity-90"
-            >
-              {initializing ? (
-                <>
-                  <Loader2 className="mr-2 w-4 h-4 animate-spin" />{" "}
-                  Initializing...
-                </>
-              ) : (
-                <>
-                  <Rocket className="mr-2 w-4 h-4" /> Initialize App
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Groq API Key in setup screen */}
-          <div className="p-5 rounded-2xl border border-[#8B5CF6]/30 bg-[#11182A] mb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <KeyRound className="w-4 h-4 text-[#8B5CF6]" />
-              <h3 className="font-heading font-semibold text-[#F2F5FF] text-base">
-                Set Groq API Key
-              </h3>
-            </div>
-            <p className="text-[#A8B0C4] text-xs mb-3">
-              Paste your Groq key (from console.groq.com) -- saves permanently
-              for all AI tools.
-            </p>
-            <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                value={groqKeyInput}
-                onChange={(e) => setGroqKeyInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSaveGroqKey()}
-                placeholder="gsk_..."
-                className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus-visible:ring-[#8B5CF6]/50 flex-1 text-sm"
-              />
-              <Button
-                onClick={handleSaveGroqKey}
-                disabled={savingGroqKey || !groqKeyInput.trim()}
-                className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 shrink-0 text-sm"
-              >
-                {savingGroqKey ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "Save Key"
-                )}
-              </Button>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Link to="/dashboard">
-              <Button
-                variant="ghost"
-                className="text-[#A8B0C4] hover:text-[#F2F5FF]"
-              >
-                Back to Dashboard
-              </Button>
-            </Link>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
   const activeCount = keys.filter((k) => k.isActive).length;
   const totalCount = keys.length;
-  const showInitBanner =
-    isAdmin === false || (hasCaffeineToken && isAdmin === null);
+  const showAdminContent = isAdmin === true || hasCaffeineToken;
+  const showSetupContent = isAdmin === false && !hasCaffeineToken;
 
   return (
     <div className="min-h-screen bg-[#070A12] text-[#F2F5FF]">
@@ -427,7 +335,15 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Initialize App */}
+          {/* Inline checking banner */}
+          {checkingAdmin && isAdmin === null && (
+            <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-[#11182A] text-[#A8B0C4] text-sm">
+              <Loader2 className="w-4 h-4 animate-spin text-[#8B5CF6] shrink-0" />
+              <span>Checking admin status...</span>
+            </div>
+          )}
+
+          {/* Initialize App -- always visible */}
           <div className="mb-8 p-6 rounded-2xl border border-white/10 bg-[#11182A]">
             <div className="flex items-center gap-3 mb-1">
               <Rocket className="w-5 h-5 text-[#22D3EE]" />
@@ -436,14 +352,31 @@ export default function AdminPage() {
               </h2>
             </div>
             <p className="text-[#A8B0C4] text-sm mb-4">
-              {showInitBanner
+              {showSetupContent
                 ? "Click Initialize to become admin and seed the AYAN license key."
                 : "Re-seed the AYAN license key if needed."}
             </p>
+            {showSetupContent && (
+              <ul className="text-[#A8B0C4] text-sm space-y-2 mb-5">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400" /> Assign you as
+                  admin
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400" /> Seed AYAN
+                  license key
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400" /> Unlock full
+                  admin panel
+                </li>
+              </ul>
+            )}
             <Button
               onClick={handleInitialize}
               disabled={initializing}
               className="bg-gradient-to-r from-[#22D3EE] to-[#8B5CF6] text-white border-0 hover:opacity-90"
+              data-ocid="admin.primary_button"
             >
               {initializing ? (
                 <>
@@ -458,7 +391,7 @@ export default function AdminPage() {
             </Button>
           </div>
 
-          {/* Groq API Key */}
+          {/* Groq API Key -- always visible */}
           <div className="mb-8 p-6 rounded-2xl border border-white/10 bg-[#11182A]">
             <div className="flex items-center gap-3 mb-1">
               <KeyRound className="w-5 h-5 text-[#8B5CF6]" />
@@ -467,7 +400,8 @@ export default function AdminPage() {
               </h2>
             </div>
             <p className="text-[#A8B0C4] text-sm mb-4">
-              Update the AI key used for all tools
+              Paste your Groq key (from console.groq.com) — saves permanently
+              for all AI tools.
             </p>
             <div className="flex items-center gap-3">
               <Input
@@ -477,11 +411,13 @@ export default function AdminPage() {
                 onKeyDown={(e) => e.key === "Enter" && handleSaveGroqKey()}
                 placeholder="gsk_..."
                 className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus-visible:ring-[#8B5CF6]/50 flex-1"
+                data-ocid="admin.input"
               />
               <Button
                 onClick={handleSaveGroqKey}
                 disabled={savingGroqKey || !groqKeyInput.trim()}
                 className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 shrink-0"
+                data-ocid="admin.save_button"
               >
                 {savingGroqKey ? (
                   <>
@@ -496,183 +432,215 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-            <div className="p-4 rounded-xl border border-white/10 bg-[#11182A]">
-              <p className="text-[#A8B0C4] text-xs uppercase tracking-wider">
-                Total Keys
-              </p>
-              <p className="font-heading font-bold text-2xl text-[#F2F5FF] mt-1">
-                {totalCount}
-              </p>
-            </div>
-            <div className="p-4 rounded-xl border border-white/10 bg-[#11182A]">
-              <p className="text-[#A8B0C4] text-xs uppercase tracking-wider">
-                Active
-              </p>
-              <p className="font-heading font-bold text-2xl text-emerald-400 mt-1">
-                {activeCount}
-              </p>
-            </div>
-            <div className="p-4 rounded-xl border border-white/10 bg-[#11182A]">
-              <p className="text-[#A8B0C4] text-xs uppercase tracking-wider">
-                Revoked / Used
-              </p>
-              <p className="font-heading font-bold text-2xl text-red-400 mt-1">
-                {totalCount - activeCount}
-              </p>
-            </div>
-          </div>
-
-          {/* Generate Key */}
-          <div className="mb-8 p-6 rounded-2xl border border-white/10 bg-[#11182A]">
-            <h2 className="font-heading font-semibold text-[#F2F5FF] text-lg mb-1">
-              Generate License Key
-            </h2>
-            <p className="text-[#A8B0C4] text-sm mb-4">
-              Create a new one-time license key to sell or distribute
-            </p>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[#A8B0C4] text-sm">
-                Auto-generate a random key
-              </span>
-              <Button
-                onClick={handleGenerateKey}
-                disabled={generatingKey}
-                className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90"
-              >
-                {generatingKey ? (
-                  <>
-                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />{" "}
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <KeyRound className="mr-2 w-4 h-4" /> Generate New Key
-                  </>
-                )}
-              </Button>
-            </div>
-            <div className="flex items-center gap-3 pt-3 border-t border-white/10">
-              <Input
-                value={customKeyInput}
-                onChange={(e) => setCustomKeyInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddCustomKey()}
-                placeholder="Enter custom key e.g. AYAN-PRO"
-                className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus-visible:ring-[#8B5CF6]/50 flex-1"
-              />
-              <Button
-                onClick={handleAddCustomKey}
-                disabled={addingCustomKey || !customKeyInput.trim()}
-                variant="outline"
-                className="border-[#8B5CF6]/40 text-[#8B5CF6] hover:bg-[#8B5CF6]/10 hover:text-[#8B5CF6] shrink-0"
-              >
-                {addingCustomKey ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Plus className="mr-1.5 w-4 h-4" /> Add Custom Key
-                  </>
-                )}
-              </Button>
-            </div>
-            {newKey && <NewKeyBox keyValue={newKey} />}
-          </div>
-
-          {/* Keys Table */}
-          <div className="rounded-2xl border border-white/10 bg-[#11182A] overflow-hidden">
-            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-              <h2 className="font-heading font-semibold text-[#F2F5FF]">
-                All License Keys
-              </h2>
-              {loadingKeys && (
-                <Loader2 className="w-4 h-4 animate-spin text-[#8B5CF6]" />
-              )}
-            </div>
-            {keys.length === 0 && !loadingKeys ? (
-              <div className="py-16 text-center">
-                <KeyRound className="w-10 h-10 text-[#A8B0C4]/30 mx-auto mb-3" />
-                <p className="text-[#A8B0C4] text-sm">No keys generated yet.</p>
-                <p className="text-[#A8B0C4]/60 text-xs mt-1">
-                  Click "Generate New Key" to create one.
-                </p>
+          {/* Admin-only content */}
+          {showAdminContent && (
+            <>
+              {/* Stats Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+                <div className="p-4 rounded-xl border border-white/10 bg-[#11182A]">
+                  <p className="text-[#A8B0C4] text-xs uppercase tracking-wider">
+                    Total Keys
+                  </p>
+                  <p className="font-heading font-bold text-2xl text-[#F2F5FF] mt-1">
+                    {totalCount}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl border border-white/10 bg-[#11182A]">
+                  <p className="text-[#A8B0C4] text-xs uppercase tracking-wider">
+                    Active
+                  </p>
+                  <p className="font-heading font-bold text-2xl text-emerald-400 mt-1">
+                    {activeCount}
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl border border-white/10 bg-[#11182A]">
+                  <p className="text-[#A8B0C4] text-xs uppercase tracking-wider">
+                    Revoked / Used
+                  </p>
+                  <p className="font-heading font-bold text-2xl text-red-400 mt-1">
+                    {totalCount - activeCount}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/10 hover:bg-transparent">
-                    <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider">
-                      Key
-                    </TableHead>
-                    <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider hidden sm:table-cell">
-                      Activated By
-                    </TableHead>
-                    <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider hidden md:table-cell">
-                      Created
-                    </TableHead>
-                    <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider text-right">
-                      Action
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {keys.map((k, i) => (
-                    <TableRow
-                      key={k.key}
-                      className="border-white/5 hover:bg-white/2"
-                    >
-                      <TableCell>
-                        <CopyableKey value={k.key} />
-                      </TableCell>
-                      <TableCell>
-                        {k.isActive ? (
-                          <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs">
-                            Active
-                          </Badge>
-                        ) : k.activatedBy ? (
-                          <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-xs">
-                            Used
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-red-500/15 text-red-400 border border-red-500/30 text-xs">
-                            Revoked
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <span className="font-mono text-xs text-[#A8B0C4]">
-                          {k.activatedBy
-                            ? truncatePrincipal(k.activatedBy.toString())
-                            : "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-[#A8B0C4] text-xs">
-                        {formatDate(k.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleRevokeKey(k.key)}
-                          disabled={!k.isActive || revokingKey === k.key}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-30"
-                          data-ocid={`admin.delete_button.${i + 1}`}
+
+              {/* Generate Key */}
+              <div className="mb-8 p-6 rounded-2xl border border-white/10 bg-[#11182A]">
+                <h2 className="font-heading font-semibold text-[#F2F5FF] text-lg mb-1">
+                  Generate License Key
+                </h2>
+                <p className="text-[#A8B0C4] text-sm mb-4">
+                  Create a new one-time license key to sell or distribute
+                </p>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[#A8B0C4] text-sm">
+                    Auto-generate a random key
+                  </span>
+                  <Button
+                    onClick={handleGenerateKey}
+                    disabled={generatingKey}
+                    className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90"
+                    data-ocid="admin.primary_button"
+                  >
+                    {generatingKey ? (
+                      <>
+                        <Loader2 className="mr-2 w-4 h-4 animate-spin" />{" "}
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="mr-2 w-4 h-4" /> Generate New Key
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-3 pt-3 border-t border-white/10">
+                  <Input
+                    value={customKeyInput}
+                    onChange={(e) => setCustomKeyInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddCustomKey()}
+                    placeholder="Enter custom key e.g. AYAN-PRO"
+                    className="bg-[#070A12] border-white/10 text-[#F2F5FF] placeholder:text-[#A8B0C4]/50 focus-visible:ring-[#8B5CF6]/50 flex-1"
+                    data-ocid="admin.input"
+                  />
+                  <Button
+                    onClick={handleAddCustomKey}
+                    disabled={addingCustomKey || !customKeyInput.trim()}
+                    variant="outline"
+                    className="border-[#8B5CF6]/40 text-[#8B5CF6] hover:bg-[#8B5CF6]/10 hover:text-[#8B5CF6] shrink-0"
+                    data-ocid="admin.secondary_button"
+                  >
+                    {addingCustomKey ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Plus className="mr-1.5 w-4 h-4" /> Add Custom Key
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {newKey && <NewKeyBox keyValue={newKey} />}
+              </div>
+
+              {/* Keys Table */}
+              <div
+                className="rounded-2xl border border-white/10 bg-[#11182A] overflow-hidden"
+                data-ocid="admin.table"
+              >
+                <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+                  <h2 className="font-heading font-semibold text-[#F2F5FF]">
+                    All License Keys
+                  </h2>
+                  {loadingKeys && (
+                    <Loader2
+                      className="w-4 h-4 animate-spin text-[#8B5CF6]"
+                      data-ocid="admin.loading_state"
+                    />
+                  )}
+                </div>
+                {keys.length === 0 && !loadingKeys ? (
+                  <div
+                    className="py-16 text-center"
+                    data-ocid="admin.empty_state"
+                  >
+                    <KeyRound className="w-10 h-10 text-[#A8B0C4]/30 mx-auto mb-3" />
+                    <p className="text-[#A8B0C4] text-sm">
+                      No keys generated yet.
+                    </p>
+                    <p className="text-[#A8B0C4]/60 text-xs mt-1">
+                      Click "Generate New Key" to create one.
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-white/10 hover:bg-transparent">
+                        <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider">
+                          Key
+                        </TableHead>
+                        <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider">
+                          Status
+                        </TableHead>
+                        <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider hidden sm:table-cell">
+                          Activated By
+                        </TableHead>
+                        <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider hidden md:table-cell">
+                          Created
+                        </TableHead>
+                        <TableHead className="text-[#A8B0C4] text-xs uppercase tracking-wider text-right">
+                          Action
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {keys.map((k, i) => (
+                        <TableRow
+                          key={k.key}
+                          className="border-white/5 hover:bg-white/2"
+                          data-ocid={`admin.row.${i + 1}`}
                         >
-                          {revokingKey === k.key ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                          <TableCell>
+                            <CopyableKey value={k.key} />
+                          </TableCell>
+                          <TableCell>
+                            {k.isActive ? (
+                              <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs">
+                                Active
+                              </Badge>
+                            ) : k.activatedBy ? (
+                              <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-xs">
+                                Used
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-red-500/15 text-red-400 border border-red-500/30 text-xs">
+                                Revoked
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            <span className="font-mono text-xs text-[#A8B0C4]">
+                              {k.activatedBy
+                                ? truncatePrincipal(k.activatedBy.toString())
+                                : "—"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-[#A8B0C4] text-xs">
+                            {formatDate(k.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRevokeKey(k.key)}
+                              disabled={!k.isActive || revokingKey === k.key}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-30"
+                              data-ocid={`admin.delete_button.${i + 1}`}
+                            >
+                              {revokingKey === k.key ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="mt-8 text-center">
+            <Link to="/dashboard">
+              <Button
+                variant="ghost"
+                className="text-[#A8B0C4] hover:text-[#F2F5FF]"
+                data-ocid="admin.link"
+              >
+                Back to Dashboard
+              </Button>
+            </Link>
           </div>
         </motion.div>
       </main>
