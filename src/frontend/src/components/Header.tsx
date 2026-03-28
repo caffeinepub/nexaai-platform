@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Menu, Moon, Sun, UserCircle, X, Zap } from "lucide-react";
+import { Menu, Moon, Shield, Sun, UserCircle, X, Zap } from "lucide-react";
 import { useState } from "react";
 import { getCurrentUser, logout } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
@@ -76,6 +76,14 @@ export default function Header() {
                 data-ocid="header.link"
               >
                 Profile
+              </Link>
+              <Link
+                to="/admin"
+                className="flex items-center gap-1.5 text-[#8B5CF6] hover:text-[#A78BFA] transition-colors text-sm font-semibold"
+                data-ocid="header.link"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                Admin
               </Link>
             </>
           )}
@@ -213,6 +221,15 @@ export default function Header() {
                 data-ocid="header.link"
               >
                 Profile
+              </Link>
+              <Link
+                to="/admin"
+                className="flex items-center gap-1.5 text-[#8B5CF6] py-2 text-sm font-semibold"
+                onClick={() => setMobileOpen(false)}
+                data-ocid="header.link"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                Admin Panel
               </Link>
               <button
                 type="button"

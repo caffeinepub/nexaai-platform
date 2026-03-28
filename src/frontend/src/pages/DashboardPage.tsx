@@ -378,6 +378,39 @@ export default function DashboardPage() {
         >
           {activeSection === "overview" && (
             <>
+              {/* Admin Panel Card -- Top of Dashboard, visible first */}
+              {isAdmin && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-4 rounded-2xl border border-[#8B5CF6]/50 bg-gradient-to-r from-[#8B5CF6]/15 to-[#22D3EE]/10 flex items-center justify-between gap-4"
+                  data-ocid="dashboard.panel"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE] flex items-center justify-center shrink-0">
+                      <Shield className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[#F2F5FF] font-semibold text-sm">
+                        Admin Panel
+                      </p>
+                      <p className="text-[#A8B0C4] text-xs">
+                        Manage license keys, Groq API key, and users
+                      </p>
+                    </div>
+                  </div>
+                  <Link to="/admin">
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-white border-0 hover:opacity-90 shrink-0"
+                      data-ocid="dashboard.primary_button"
+                    >
+                      <Shield className="w-3.5 h-3.5 mr-1.5" />
+                      Open Admin
+                    </Button>
+                  </Link>
+                </motion.div>
+              )}
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="font-heading font-bold text-2xl sm:text-3xl text-[#F2F5FF]">
